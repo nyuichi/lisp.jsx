@@ -93,7 +93,7 @@ class IO {
 	
 }
 
-class Pair {
+class Cons {
 	var car : variant;
 	var cdr : variant;
 	function constructor(car : variant, cdr : variant) {
@@ -176,7 +176,7 @@ class Reader {
 		this.unwind();
 	}
 
-	function readPair() : variant {
+	function readCons() : variant {
 		this.skipWhiteSpaces();
 
 		var c = this.getChar();
@@ -193,8 +193,8 @@ class Reader {
 		}
 		else {
 			var car = this.read();
-			var cdr = this.readPair();
-			return new Pair(car, cdr);
+			var cdr = this.readCons();
+			return new Cons(car, cdr);
 		}
 	}
 
@@ -205,7 +205,7 @@ class Reader {
 
 		if (c == '(') {
 			this.advance();
-			return this.readPair();
+			return this.readCons();
 		}
 		else {
 			var str = '';
@@ -226,7 +226,7 @@ class Reader {
 
 class Printer {
 
-	static function formatPair(pair : Pair) : string {
+	static function formatCons(pair : Cons) : string {
 		var str = '(';
 		str += Printer.format(pair.car);
 		str += ' . ';
@@ -246,8 +246,8 @@ class Printer {
 			if (x instanceof Symbol) {
 				str += (obj as Symbol).name;
 			}
-			else if (x instanceof Pair) {
-				str += Printer.formatPair(obj as Pair);
+			else if (x instanceof Cons) {
+				str += Printer.formatCons(obj as Cons);
 			}
 			else if (x instanceof Nil) {
 				str += 'nil';
@@ -274,8 +274,8 @@ class Evaluator {
 		return typeof(value) == 'object' && (value as Object) instanceof Symbol;
 	}
 	
-	static function valueIsPair(value : variant) : boolean {
-		return typeof(value) == 'object' && (value as Object) instanceof Pair;
+	static function valueIsCons(value : variant) : boolean {
+		return typeof(value) == 'object' && (value as Object) instanceof Cons;
 	}
 
 	static function valueIsNil(value : variant) : boolean {
@@ -292,34 +292,34 @@ class Evaluator {
 				throw 'Unbound Symbol: '+symbol.name;
 			}
 			else {
-				return (symbol.value as Pair).car;
+				return (symbol.value as Cons).car;
 			}
 		}
-		else if (Evaluator.valueIsPair(expr)) {
-			var op = (expr as Pair).car;
-			var args = (expr as Pair).cdr;
+		else if (Evaluator.valueIsCons(expr)) {
+			var op = (expr as Cons).car;
+			var args = (expr as Cons).cdr;
 			if (Evaluator.valueIsSymbol(op)) {
 				switch ((op as Symbol).name) {
 				case 'defun':
-					var name = (args as Pair).car;
-					var lambda = new Pair(Package.intern("lambda"), (args as Pair).cdr);
+					var name = (args as Cons).car;
+					var lambda = new Cons(Package.intern("lambda"), (args as Cons).cdr);
 					(name as Symbol).func = lambda;
 					return name;
 				case 'if':
-					var test = Evaluator.eval((args as Pair).car);
+					var test = Evaluator.eval((args as Cons).car);
 					if (Evaluator.valueIsNil(test)) {
 						return Evaluator.eval(
-							new Pair(Package.intern("progn")
-								,(((args as Pair).cdr) as Pair).cdr));
+							new Cons(Package.intern("progn")
+								,(((args as Cons).cdr) as Cons).cdr));
 					}
 					else {
-						return Evaluator.eval((((args as Pair).cdr) as Pair).car);
+						return Evaluator.eval((((args as Cons).cdr) as Cons).car);
 					}
 				case 'progn':
 					var result;
 					do {
-						result = Evaluator.eval((args as Pair).car);
-						args = (args as Pair).cdr;
+						result = Evaluator.eval((args as Cons).car);
+						args = (args as Cons).cdr;
 					} while (!Evaluator.valueIsNil(args));
 					return result;
 				default:
@@ -328,11 +328,11 @@ class Evaluator {
 						if (Evaluator.valueIsNil(args)) {
 							return args;
 						}
-						else if (Evaluator.valueIsPair(args)) {
-							var pair = args as Pair;
+						else if (Evaluator.valueIsCons(args)) {
+							var pair = args as Cons;
 							var car = Evaluator.eval(pair.car);
 							var cdr = eval_args(pair.cdr);
-							return new Pair(car, cdr);
+							return new Cons(car, cdr);
 						}
 						else {
 							throw 'Invalid lambda list';
@@ -346,23 +346,23 @@ class Evaluator {
 						return (func as (variant)->variant)(args);
 					}
 					else {
-						var parms = ((func as Pair).cdr as Pair).car;
+						var parms = ((func as Cons).cdr as Cons).car;
 
 						while (!Evaluator.valueIsNil(parms)) {
-							var symbol = (parms as Pair).car as Symbol;
-							symbol.value = new Pair((args as Pair).car, symbol.value);
-							parms = (parms as Pair).cdr;
-							args = (args as Pair).cdr;
+							var symbol = (parms as Cons).car as Symbol;
+							symbol.value = new Cons((args as Cons).car, symbol.value);
+							parms = (parms as Cons).cdr;
+							args = (args as Cons).cdr;
 						}
 						
-						var body =  new Pair(Package.intern("progn"), ((func as Pair).cdr as Pair).cdr);
+						var body =  new Cons(Package.intern("progn"), ((func as Cons).cdr as Cons).cdr);
 						var result = Evaluator.eval(body);
 
-						parms = ((func as Pair).cdr as Pair).car;
+						parms = ((func as Cons).cdr as Cons).car;
 						while (!Evaluator.valueIsNil(parms)) {
-							var symbol = (parms as Pair).car as Symbol;
-							symbol.value = (symbol.value as Pair).cdr;
-							parms = (parms as Pair).cdr;
+							var symbol = (parms as Cons).car as Symbol;
+							symbol.value = (symbol.value as Cons).cdr;
+							parms = (parms as Cons).cdr;
 						}
 
 						return result;
@@ -383,13 +383,13 @@ class Evaluator {
 class _Main {
 	static function main(args : string[]) : void {
 		Package.intern("print").func = function(args : variant) : variant {
-			Printer.print((args as Pair).car);
+			Printer.print((args as Cons).car);
 			return new Nil;
 		};
 
 		Package.intern("=").func = function(args : variant) : variant {
-			var first = (args as Pair).car as number;
-			var second = ((args as Pair).cdr as Pair).car as number;
+			var first = (args as Cons).car as number;
+			var second = ((args as Cons).cdr as Cons).car as number;
 			if (first == second) {
 				return Package.intern("t");
 			}
@@ -399,14 +399,14 @@ class _Main {
 		};
 
 		Package.intern("*").func = function(args : variant) : variant {
-			var first = (args as Pair).car as number;
-			var second = ((args as Pair).cdr as Pair).car as number;
+			var first = (args as Cons).car as number;
+			var second = ((args as Cons).cdr as Cons).car as number;
 			return first * second;
 		};
 			
 		Package.intern("-").func = function(args : variant) : variant {
-			var first = (args as Pair).car as number;
-			var second = ((args as Pair).cdr as Pair).car as number;
+			var first = (args as Cons).car as number;
+			var second = ((args as Cons).cdr as Cons).car as number;
 			return first - second;
 		};
 
